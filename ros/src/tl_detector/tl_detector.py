@@ -14,6 +14,14 @@ import yaml
 STATE_COUNT_THRESHOLD = 3
 
 class TLDetector(object):
+    """ detect and classify traffic light
+
+        @subscribed /current_pose:           the vehicle's current position
+        @subscribed /base_waypoints:         the complete list of waypoints the car will be following
+        @subscribed /image_color:      
+        @subscribed /vehicle/traffic_lights: the exact location and status of all traffic lights in simulator
+        @published  /traffic_waypoint:       the locations to stop for red traffic lights
+    """
     def __init__(self):
         rospy.init_node('tl_detector')
 

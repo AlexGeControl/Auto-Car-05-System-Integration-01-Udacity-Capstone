@@ -32,6 +32,16 @@ that we have created in the `__init__` function.
 '''
 
 class DBWNode(object):
+    """ generate drive-by-wire(DBW) command for autonomous driving
+   
+        @subscribed /vehicle/dbw_enabled:  the indicator for whether the car is under dbw or driver control
+        @subscribed /current_velocity:     the vehicle's target linear velocities
+        @subscribed /twist_cmd:            the vehicle's target angular velocities
+
+        @published  /vehicle/brake_cmd:    the final brake for electronic control   
+        @published  /vehicle/throttle_cmd: the final throttle for electronic control  
+        @published  /vehicle/steering_cmd: the final steering for electronic control      
+    """
     def __init__(self):
         rospy.init_node('dbw_node')
 

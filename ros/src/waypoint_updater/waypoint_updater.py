@@ -25,6 +25,15 @@ LOOKAHEAD_WPS = 200 # Number of waypoints we will publish. You can change this n
 
 
 class WaypointUpdater(object):
+    """ update the target velocity of each waypoint based on traffic light and obstacle detection data
+
+        @subscribed /current_pose:      the vehicle's current position
+        @subscribed /base_waypoints:    the complete list of waypoints the car will be following
+        @subscribed /obstacle_waypoint: the locations to stop for obstacles    
+        @subscribed /traffic_waypoint:  the locations to stop for red traffic lights
+
+        @published  /final_waypoints:   the list of waypoints ahead of the car with final target velocities   
+    """
     def __init__(self):
         rospy.init_node('waypoint_updater')
 

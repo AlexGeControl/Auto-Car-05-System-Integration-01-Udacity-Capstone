@@ -4,6 +4,8 @@ ONE_MPH = 0.44704
 
 
 class Controller(object):
+    """ generate target angular velocities for ego vehicle
+    """
     def __init__(self, *args, **kwargs):
         # TODO: Implement
         pass
