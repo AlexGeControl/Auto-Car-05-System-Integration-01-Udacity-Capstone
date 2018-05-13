@@ -35,6 +35,7 @@ class WaypointUpdater(object):
     """
     WAYPOINT_UPDATE_FREQ = 50 # Waypoint update frequency
     LOOKAHEAD_WPS = 200       # Number of waypoints we will publish. You can change this number
+    MAX_DECELERATION = 10     # Max deceleration
 
     def __init__(self):
         rospy.init_node('waypoint_updater')
@@ -46,11 +47,14 @@ class WaypointUpdater(object):
         self._base_waypoints_location = None
         self._base_waypoints_index = None
 
+        # stopline waypoint:
+        self.stop_line_waypoint_index = -1
+
         # subscribe:
         rospy.Subscriber('/current_pose', PoseStamped, self.pose_cb)
         rospy.Subscriber('/base_waypoints', Lane, self.waypoints_cb)
-        rospy.Subscriber('/obstacle_waypoint', Lane, self.obstacle_cb)
         rospy.Subscriber('/traffic_waypoint', Lane, self.traffic_cb)
+        rospy.Subscriber('/obstacle_waypoint', Lane, self.obstacle_cb)
 
         # publish:
         self.final_waypoints_pub = rospy.Publisher('final_waypoints', Lane, queue_size=1)
@@ -77,12 +81,12 @@ class WaypointUpdater(object):
                 self._base_waypoints_location
             )
 
+    def traffic_cb(self, msg):
+        # update stop line waypoint index
+        self.stop_line_waypoint_index = msg.data
+
     def obstacle_cb(self, msg):
         # TODO: Callback for /obstacle_waypoint message. We will implement it later
-        pass
-
-    def traffic_cb(self, msg):
-        # TODO: Callback for /traffic_waypoint message. Implement
         pass
 
     def get_waypoint_velocity(self, waypoint):
@@ -128,18 +132,54 @@ class WaypointUpdater(object):
 
         return next_waypoint_index
 
-    def publish_next_waypoints(self, next_waypoint_index):
-        """ publish next waypoints
+    def generate_decelerated_waypoints(self, next_waypoints, next_waypoint_index_start):
+        """ generate decelerated waypoints
         """
+        decelerated_waypoints = list(next_waypoints)
+
+        ego_vehicle_stop_waypoint_index = max(self.stop_line_waypoint_index - next_waypoint_index_start - 2, 0)
+        for i in enumerate(ego_vehicle_stop_waypoint_index + 1):
+            # ego vehicle's distance to target stop waypoint:
+            distance_to_stop_line = self.distance(decelerated_waypoints, i, ego_vehicle_stop_waypoint_index)
+            # in order to stop at that waypoint, velocity should be velocity ** 2 / (2 * MAX_DECELERATION) = distance_to_stop_line
+            decelerated_velocity = np.sqrt(2 * WaypointUpdater.MAX_DECELERATION * distance_to_stop_line)
+            if decelerated_velocity < 1.0:
+                decelerated_velocity = 0.0
+            self.set_waypoint_velocity(
+                decelerated_waypoints, 
+                i, 
+                min(
+                    self.get_waypoint_velocity(decelerated_waypoints[i]),
+                    decelerated_velocity
+                )
+            )
+
+        return decelerated_waypoints
+
+    def generate_next_waypoints(self, next_waypoint_index_start):
         # init:
         next_lane = Lane()
 
         # set header:
         next_lane.header = self.base_waypoints.header
         # set waypoints:
+        next_waypoint_index_end = next_waypoint_index_start + WaypointUpdater.LOOKAHEAD_WPS
         next_lane.waypoints = self.base_waypoints.waypoints[
-            next_waypoint_index: next_waypoint_index + WaypointUpdater.LOOKAHEAD_WPS
+            next_waypoint_index_start: next_waypoint_index_end
         ]
+
+        print("[Next Waypoints]: ({}, {})".format(next_waypoint_index_start, next_waypoint_index_end))
+        if self.stop_line_waypoint_index != -1 and self.stop_line_waypoint_index < next_waypoint_index_end:
+            print("[Generate Decelerated Waypoints]")
+            next_lane.waypoints = self.generate_decelerated_waypoints(next_lane.waypoints, next_waypoint_index_start)
+
+        return next_lane
+
+    def publish_next_waypoints(self, next_waypoint_index):
+        """ publish next waypoints
+        """
+        # generate:
+        next_lane = self.generate_next_waypoints(next_waypoint_index)
 
         # publish:
         self.final_waypoints_pub.publish(next_lane)
