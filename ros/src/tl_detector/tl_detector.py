@@ -26,6 +26,10 @@ class TLDetector(object):
         
         @published  /traffic_waypoint:       the index of the waypoint for nearest upcoming red light's stop line
     """
+    CAMERA_IMAGE_COLLECTION_BEFORE_LINE_WPS = 300
+    CAMERA_IMAGE_CLASSIFICATION_WPS = 203
+    CAMERA_IMAGE_COLLECTION_AFTER_LINE_COUNT = 20
+
     def __init__(self):
         rospy.init_node('tl_detector')
 
@@ -46,6 +50,9 @@ class TLDetector(object):
         self.last_state = TrafficLight.UNKNOWN
         self.last_wp = -1
         self.state_count = 0
+
+        # image collector:
+        self.after_stop_line_count = TLDetector.CAMERA_IMAGE_COLLECTION_AFTER_LINE_COUNT
 
         # classifier:
         self.bridge = CvBridge()
@@ -96,8 +103,10 @@ class TLDetector(object):
             msg (Image): image from car-mounted camera
 
         """
+        # parse input:
         self.has_image = True
         self.camera_image = msg
+        # process traffic lights:
         stop_line_waypoint_index, state = self.process_traffic_lights()
 
         '''
@@ -169,6 +178,36 @@ class TLDetector(object):
 
         return self.light_classifier.get_classification(cv_image)
 
+    def save_traffic_light_image(self, index, distance, state):
+        """ Save traffic light image for offline training
+        """
+        order = "before"
+        # process labels according to ego vehicle distance to oncoming stop line:
+        if distance > TLDetector.CAMERA_IMAGE_COLLECTION_BEFORE_LINE_WPS:
+            if self.after_stop_line_count > 0:
+                self.after_stop_line_count -= 1
+                order = "after"
+                index -= 1
+                distance = self.after_stop_line_count
+            else:
+                return 
+        elif distance > TLDetector.CAMERA_IMAGE_CLASSIFICATION_WPS:
+            state = TrafficLight.UNKNOWN
+        elif distance <= 2:
+            self.after_stop_line_count = TLDetector.CAMERA_IMAGE_COLLECTION_AFTER_LINE_COUNT
+
+        # format image:
+        traffic_light_image = self.bridge.imgmsg_to_cv2(self.camera_image, "bgr8")
+        # generate filename:
+        filename = "traffic_light_images/{}--{}-{}--{}=={}.jpg".format(
+            rospy.Time.now().to_nsec(),
+            order,
+            index, 
+            distance,
+            state
+        )
+        cv2.imwrite(filename, traffic_light_image)
+
     def get_light_state_from_telegram(self, light):
         """ Determines the closest traffic light state from telegram broadcast
         """
@@ -204,10 +243,15 @@ class TLDetector(object):
                     closest_stop_line_waypoint_index = stop_line_waypoint_index
 
         if closest_stop_line_waypoint_index:
-            # method 01: image analysis
-            # state = self.get_light_state_from_camera()
-            # method 02: telegram
+            # method 01: telegram:
             state = self.get_light_state_from_telegram(self.lights[closest_stop_line_index])
+            # method 02: image analysis
+            # state = self.get_light_state_from_camera()
+
+            # image collection: 
+            self.save_traffic_light_image(
+                closest_stop_line_index, closest_distance, state
+            )
             return closest_stop_line_waypoint_index, state
 
         return -1, TrafficLight.UNKNOWN
