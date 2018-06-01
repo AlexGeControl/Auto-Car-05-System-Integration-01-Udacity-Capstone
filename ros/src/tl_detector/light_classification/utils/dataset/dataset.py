@@ -27,6 +27,7 @@ class Dataset:
                 self.images.append(image)
                 # parse label:
                 label = int(parsed.group(5))
+                # change unknown code to 3 for deep learning modeling:
                 if label == 4:
                     label = 3
                 self.labels.append(label)

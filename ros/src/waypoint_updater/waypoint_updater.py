@@ -173,7 +173,7 @@ class WaypointUpdater(object):
         # set waypoints:
         next_waypoint_index_end = next_waypoint_index_start + WaypointUpdater.LOOKAHEAD_WPS
 
-        rospy.logwarn("[Next Waypoints]: [%d, %d]--%d",next_waypoint_index_start, next_waypoint_index_end, self.stop_line_waypoint_index)
+        # rospy.logwarn("[Next Waypoints]: [%d, %d]--%d",next_waypoint_index_start, next_waypoint_index_end, self.stop_line_waypoint_index)
         if self.stop_line_waypoint_index == -1 or self.stop_line_waypoint_index >= next_waypoint_index_end:
             next_lane.waypoints = self.base_waypoints.waypoints[
                 next_waypoint_index_start: next_waypoint_index_end
