@@ -149,7 +149,7 @@ class TLDetector(object):
             self.state = state
         elif self.state_count >= STATE_COUNT_THRESHOLD:
             self.last_state = self.state
-            stop_line_waypoint_index = stop_line_waypoint_index if state == TrafficLight.RED else -1
+            stop_line_waypoint_index = stop_line_waypoint_index if (state == TrafficLight.RED or state == TrafficLight.YELLOW) else -1
             self.last_wp = stop_line_waypoint_index
             self.upcoming_red_light_pub.publish(Int32(stop_line_waypoint_index))
         else:
@@ -308,8 +308,9 @@ class TLDetector(object):
                 # prompt:
                 rospy.logwarn(
                     "[Discrepancy between Telegram and Camera]: %d--%d, Camera Image Saved",state_telegram, state_camera
-                ) 
-            return closest_stop_line_waypoint_index, state_camera
+                )
+
+            return closest_stop_line_waypoint_index, state_telegram
 
         return -1, TrafficLight.UNKNOWN
 

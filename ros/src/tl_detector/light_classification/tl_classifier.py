@@ -130,7 +130,7 @@ class TLClassifier(object):
 
         # dense 1:
         x = Dense(
-            units = 32,
+            units = 48,
             activation='relu',
             kernel_initializer='he_normal'
         )(x)
@@ -146,7 +146,7 @@ class TLClassifier(object):
 
         # loss and optimization:
         model.compile(
-            optimizer=Adam(lr=1e-3),
+            optimizer=Adam(lr=5e-4),
             loss='sparse_categorical_crossentropy',
             metrics=[sparse_categorical_accuracy]
         )
@@ -157,9 +157,9 @@ class TLClassifier(object):
         """ pre-process camera image for traffic light classification
 
         Args:
-
+            image (cv2.Image): raw image input
         Returns:
-
+            processed image for classifcation
         """
         # step 1 -- crop to ROI:
         ROI = image[self.ROI.top:self.ROI.bottom, self.ROI.left:self.ROI.right, :]
@@ -183,6 +183,12 @@ class TLClassifier(object):
 
     def train(self, X_train, y_train, num_epochs, batch_size):
         """ train classifier:
+
+        Args:
+            X_train (numpy.ndarray): training images
+            y_train (numpy.ndarray): training labels
+            num_epochs (int): number of epochs
+            batch_size (int): mini-batch size
         """
         with self.graph.as_default():
             # training image generator:
@@ -248,8 +254,8 @@ if __name__ == '__main__':
         tl_classifier.train(
             X_train = dataset.images,
             y_train = dataset.labels,
-            num_epochs = 16,
-            batch_size = 512
+            num_epochs = 32,
+            batch_size = 1024
         )
 
         # save model:

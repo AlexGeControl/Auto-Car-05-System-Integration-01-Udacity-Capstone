@@ -6,6 +6,7 @@ from geometry_msgs.msg import PoseStamped
 from styx_msgs.msg import Lane, Waypoint
 from scipy.spatial import KDTree
 
+import copy
 import math
 import numpy as np
 
@@ -35,8 +36,8 @@ class WaypointUpdater(object):
         @published  /final_waypoints:   the list of waypoints ahead of the car with final target velocities   
     """
     WAYPOINT_UPDATE_FREQ = 10 # Waypoint update frequency
-    LOOKAHEAD_WPS = 200       # Number of waypoints we will publish. You can change this number
-    MAX_DECELERATION = 10     # Max deceleration
+    LOOKAHEAD_WPS = 50       # Number of waypoints we will publish. You can change this number
+    MAX_DECELERATION = 2.5     # Max deceleration
 
     def __init__(self):
         rospy.init_node('waypoint_updater')
@@ -135,9 +136,10 @@ class WaypointUpdater(object):
     def generate_decelerated_waypoints(self, next_waypoints, next_waypoint_index_start):
         """ generate decelerated waypoints
         """
-        decelerated_waypoints = list(next_waypoints)
+        ego_vehicle_stop_waypoint_index = max(self.stop_line_waypoint_index - next_waypoint_index_start - 3, 0)
 
-        ego_vehicle_stop_waypoint_index = max(self.stop_line_waypoint_index - next_waypoint_index_start - 2, 0)
+        decelerated_waypoints = copy.deepcopy(next_waypoints[:ego_vehicle_stop_waypoint_index + 1])
+
         for i in range(ego_vehicle_stop_waypoint_index + 1):
             # ego vehicle's distance to target stop waypoint:
             distance_to_stop_line = self.distance(decelerated_waypoints, i, ego_vehicle_stop_waypoint_index)
@@ -157,8 +159,6 @@ class WaypointUpdater(object):
                 i, 
                 decelerated_velocity
             )
-            
-            rospy.logwarn("[Decelerated Waypoints]: %d--%f",i + 1, decelerated_velocity)
 
         return decelerated_waypoints
 
@@ -178,12 +178,38 @@ class WaypointUpdater(object):
             next_lane.waypoints = self.base_waypoints.waypoints[
                 next_waypoint_index_start: next_waypoint_index_end
             ]
+
+            for i in range(5):
+                rospy.logwarn(
+                    "[Normal Waypoints]: %d--%f / %f",
+                    i + 1, 
+                    self.get_waypoint_velocity(next_lane.waypoints[i]),
+                    self.get_waypoint_velocity(self.base_waypoints.waypoints[next_waypoint_index_start + i])
+                )
+            rospy.logwarn(
+                "[Normal Waypoints]: Done--%d",
+                self.stop_line_waypoint_index
+            )
         else:
             next_lane.waypoints = self.generate_decelerated_waypoints(
                 self.base_waypoints.waypoints[
                     next_waypoint_index_start: next_waypoint_index_end
                 ], 
                 next_waypoint_index_start
+            )
+
+            for i in range(
+                min(5, len(next_lane.waypoints))
+            ):
+                rospy.logwarn(
+                    "[Decelerated Waypoints]: %d--%f / %f",
+                    i + 1, 
+                    self.get_waypoint_velocity(next_lane.waypoints[i]),
+                    self.get_waypoint_velocity(self.base_waypoints.waypoints[next_waypoint_index_start + i])
+                )
+            rospy.logwarn(
+                "[Decelerated Waypoints]: Done--%d",
+                self.stop_line_waypoint_index
             )
 
         return next_lane
