@@ -1,12 +1,39 @@
+import os
+import os.path
+import time
+import timeit
+import re
 from collections import namedtuple
+from utils.dataset import Dataset
+# image processing:
+import numpy as np
 import cv2
+# keras:
+import tensorflow as tf
+from keras import backend as K
+from keras.layers import Input
+from keras.layers import SeparableConv2D, Conv2D, BatchNormalization, MaxPooling2D
+from keras.layers import Flatten, Dense
+from keras.models import Model
+from keras.optimizers import Adam
+from keras.preprocessing.image import ImageDataGenerator
+from keras.metrics import sparse_categorical_accuracy
+from keras.callbacks import TensorBoard, ReduceLROnPlateau
+# ROS:
 from styx_msgs.msg import TrafficLight
 
 class TLClassifier(object):
     # region of interest:
-    ROI = namedtuple('ROI', ['top', 'left', 'bottom', 'right'], verbose=True)
+    ROI = namedtuple('ROI', ['top', 'left', 'bottom', 'right'], verbose=False)
     # image size:
-    ImageSize = namedtuple('ImageSize', ['height', 'width'], verbose=True)
+    ImageSize = namedtuple('ImageSize', ['height', 'width'], verbose=False)
+    # traffic light encoding:
+    ENCODING = {
+        0: TrafficLight.RED,
+        1: TrafficLight.YELLOW,
+        2: TrafficLight.GREEN,
+        3: TrafficLight.UNKNOWN
+    }
 
     def __init__(
         self,
@@ -30,6 +57,101 @@ class TLClassifier(object):
         self.input_size_ = tuple(
             (self.input_size.width, self.input_size.height)
         )
+
+        # init model:
+        self.graph = tf.get_default_graph()
+        with self.graph.as_default():
+            self.model = self.__build_classifier()
+
+        # init cookbook:
+    def __build_classifier(self):
+        """ define classifier for traffic light classification
+
+        Args:
+        
+        Returns:
+
+        """
+        # input:
+        input = Input(
+            shape=(self.input_size.height, self.input_size.width, 3)
+        )
+
+        # separable conv 1:
+        x = SeparableConv2D(
+            filters = 16,
+            kernel_size = (3, 3),
+            padding = 'same',
+            activation = 'relu',
+            depthwise_initializer = 'he_normal',
+            pointwise_initializer = 'he_normal'
+        )(input)
+        x = BatchNormalization()(x)
+
+        # separable conv 2:
+        x = SeparableConv2D(
+            filters = 16,
+            kernel_size = (3, 3),
+            padding = 'same',
+            activation = 'relu',
+            depthwise_initializer = 'he_normal',
+            pointwise_initializer = 'he_normal'
+        )(x)
+        x = BatchNormalization()(x)
+
+        # max pooling 1:
+        x = MaxPooling2D()(x)
+
+        # separable conv 3:
+        x = SeparableConv2D(
+            filters = 16,
+            kernel_size = (3, 3),
+            padding = 'same',
+            activation = 'relu',
+            depthwise_initializer = 'he_normal',
+            pointwise_initializer = 'he_normal'
+        )(x)
+        x = BatchNormalization()(x)
+
+        # max pooling 2:
+        x = MaxPooling2D()(x)
+
+        # 1-by-1 conv 4:
+        x = Conv2D(
+            filters = 4,
+            kernel_size = (1, 1),
+            padding = 'same',
+            activation = 'relu',
+            kernel_initializer = 'he_normal'
+        )(x)
+
+        # flatten:
+        x = Flatten()(x)
+
+        # dense 1:
+        x = Dense(
+            units = 32,
+            activation='relu',
+            kernel_initializer='he_normal'
+        )(x)
+
+        # prediction:
+        prediction = Dense(
+            units = 4, 
+            activation='softmax'
+        )(x)
+
+        # model handler:
+        model = Model(inputs=input, outputs=prediction)
+
+        # loss and optimization:
+        model.compile(
+            optimizer=Adam(lr=1e-3),
+            loss='sparse_categorical_crossentropy',
+            metrics=[sparse_categorical_accuracy]
+        )
+
+        return model        
 
     def preprocess(self, image):
         """ pre-process camera image for traffic light classification
@@ -59,8 +181,32 @@ class TLClassifier(object):
 
         return cv2.cvtColor(YUV, cv2.COLOR_YUV2BGR)
 
-    def get_classification(self, image):
-        """Determines the color of the traffic light in the image
+    def train(self, X_train, y_train, num_epochs, batch_size):
+        """ train classifier:
+        """
+        with self.graph.as_default():
+            # training image generator:
+            image_generator = ImageDataGenerator(horizontal_flip = True)
+
+            # number of batches per epoch:
+            num_batches = (len(X_train) // batch_size) + 1
+
+            # callbacks:
+            callback_tensorboard = TensorBoard(
+                log_dir='./logs', 
+                write_graph=True
+            )
+
+            # fit model:
+            self.model.fit_generator(
+                image_generator.flow(X_train, y_train, batch_size = batch_size),
+                steps_per_epoch = num_batches, 
+                epochs = num_epochs,
+                callbacks=[callback_tensorboard]
+            )
+
+    def predict(self, image):
+        """ determines the color of the traffic light in the image
 
         Args:
             image (cv::Mat): image containing the traffic light
@@ -69,5 +215,71 @@ class TLClassifier(object):
             int: ID of traffic light color (specified in styx_msgs/TrafficLight)
 
         """
-        #TODO implement light color prediction
-        return TrafficLight.UNKNOWN
+        with self.graph.as_default():
+            result = np.argmax(
+                self.model.predict(image)
+            )
+
+        return TLClassifier.ENCODING[result]
+
+    def save(self, filename):
+        """ save model parameters
+        """
+        with self.graph.as_default():
+            self.model.save_weights(filename)
+
+    def load(self, filename):
+        """ load model parameters
+        """
+        with self.graph.as_default():
+            self.model.load_weights(filename)
+
+if __name__ == '__main__':
+    # init classifer:
+    tl_classifier = TLClassifier()
+
+    # load dataset:
+    dataset = Dataset('./traffic_light_images')
+
+    # identify existing models:
+    filenames = os.listdir('./models')
+    if not filenames:
+        # train:
+        tl_classifier.train(
+            X_train = dataset.images,
+            y_train = dataset.labels,
+            num_epochs = 16,
+            batch_size = 512
+        )
+
+        # save model:
+        timestamp = int(round(time.time()))
+        tl_classifier.save(
+            "models/{}-model-params.h5".format(timestamp)
+        )
+    else:
+        FILENAME_PATTERN = re.compile('(\d+)-model-params.h5')
+
+        # parse model timestamps:
+        timestamps = [int(FILENAME_PATTERN.match(filename).group(1)) for filename in filenames]
+
+        # identify latest model:
+        _, latest_model_filename = max(zip(timestamps, filenames), key = lambda t: t[0])
+        
+        # load latest model:
+        tl_classifier.load(os.path.join('./models', latest_model_filename))
+
+        # get inference time statistics:    
+        start = time.time()
+
+        N = 1000
+        for _ in range(N):
+            image = dataset.images[0][np.newaxis]
+            label = tl_classifier.predict(image)
+            
+        end = time.time()
+
+        # mean inference time:
+        mean_inference_time = float(end - start) / N
+
+        print "[Mean Inference Time per Frame]: {}--{}".format(mean_inference_time, label)

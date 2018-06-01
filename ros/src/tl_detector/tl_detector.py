@@ -8,6 +8,8 @@ from sensor_msgs.msg import Image
 from cv_bridge import CvBridge
 from light_classification.tl_classifier import TLClassifier
 
+import os
+import re
 import numpy as np
 from scipy.spatial import KDTree
 import tf
@@ -26,7 +28,7 @@ class TLDetector(object):
         
         @published  /traffic_waypoint:       the index of the waypoint for nearest upcoming red light's stop line
     """
-    CAMERA_IMAGE_COLLECTION_BEFORE_LINE_WPS = 300
+    CAMERA_IMAGE_COLLECTION_BEFORE_LINE_WPS = 150
     CAMERA_IMAGE_CLASSIFICATION_WPS = 103
     CAMERA_IMAGE_COLLECTION_AFTER_LINE_COUNT = 40
 
@@ -55,9 +57,27 @@ class TLDetector(object):
         self.after_stop_line_count = TLDetector.CAMERA_IMAGE_COLLECTION_AFTER_LINE_COUNT
 
         # classifier:
-        self.bridge = CvBridge()
-        self.light_classifier = TLClassifier()
         self.listener = tf.TransformListener()
+        self.bridge = CvBridge()
+
+        filenames = os.listdir('./light_classification/models')
+        if not filenames:
+            pass
+        else:
+            # model name pattern:
+            FILENAME_PATTERN = re.compile('(\d+)-model-params.h5')
+
+            # parse model timestamps:
+            timestamps = [int(FILENAME_PATTERN.match(filename).group(1)) for filename in filenames]
+
+            # identify latest model:
+            _, latest_model_filename = max(zip(timestamps, filenames), key = lambda t: t[0])
+
+            # load latest model:
+            self.light_classifier = TLClassifier()
+            self.light_classifier.load(
+                os.path.join('./light_classification/models', latest_model_filename)
+            )
 
         # subscribe:
         rospy.Subscriber('/base_waypoints', Lane, self.waypoints_cb)
@@ -174,9 +194,14 @@ class TLDetector(object):
             self.prev_light_loc = None
             return TrafficLight.UNKNOWN
 
+        # format as OpenCV:
         cv_image = self.bridge.imgmsg_to_cv2(self.camera_image, "bgr8")
 
-        return self.light_classifier.get_classification(cv_image)
+        # preprocess:
+        preprocessed_image = self.light_classifier.preprocess(cv_image)
+
+        # predict:
+        return self.light_classifier.predict(preprocessed_image[np.newaxis])
 
     def save_traffic_light_image(self, index, distance, state):
         """ Save traffic light image for offline training
@@ -245,15 +270,21 @@ class TLDetector(object):
 
         if closest_stop_line_waypoint_index:
             # method 01: telegram:
-            state = self.get_light_state_from_telegram(self.lights[closest_stop_line_index])
+            state_telegram = self.get_light_state_from_telegram(self.lights[closest_stop_line_index])
             # method 02: image analysis
-            # state = self.get_light_state_from_camera()
+            state_camera = self.get_light_state_from_camera()
 
-            # image collection: 
-            self.save_traffic_light_image(
-                closest_stop_line_index, closest_distance, state
-            )
-            return closest_stop_line_waypoint_index, state
+            # image collection:
+            if state_telegram != state_camera:
+                # prompt:
+                rospy.logwarn(
+                    "[Discrepancy between Telegram and Camera]: %d--%d",state_telegram, state_camera
+                ) 
+                # save for hard negative mining:
+                self.save_traffic_light_image(
+                    closest_stop_line_index, closest_distance, state_telegram
+                )
+            return closest_stop_line_waypoint_index, state_camera
 
         return -1, TrafficLight.UNKNOWN
 
