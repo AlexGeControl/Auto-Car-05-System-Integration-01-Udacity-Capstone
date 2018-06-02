@@ -298,6 +298,7 @@ class TLDetector(object):
             # method 02: image analysis
             state_camera = self.get_light_state_from_camera()
 
+            '''
             # save for hard negative mining:
             self.save_traffic_light_image(
                 closest_stop_line_index, order, closest_distance, state_telegram
@@ -315,9 +316,8 @@ class TLDetector(object):
                     state_telegram, state_camera,
                     closest_stop_line_index
                 )
-            '''
             
-            return closest_stop_line_waypoint_index, state_telegram
+            return closest_stop_line_waypoint_index, state_camera
 
         return -1, TrafficLight.UNKNOWN
 
