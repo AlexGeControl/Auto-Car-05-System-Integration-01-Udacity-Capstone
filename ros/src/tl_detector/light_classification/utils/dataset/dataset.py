@@ -19,20 +19,21 @@ class Dataset:
         self.labels = []
 
         # parse dataset:
-        for filename in os.listdir(path):
-            parsed = Dataset.FILENAME_PATTERN.match(filename)
-            if parsed:
-                # parse image: 
-                image = cv2.imread(os.path.join(path, filename))
-                self.images.append(image)
-                # parse label:
-                label = int(parsed.group(5))
-                # change unknown code to 3 for deep learning modeling:
-                if label == 4:
-                    label = 3
-                self.labels.append(label)
-            else:
-                continue
+        for dirpath, _, filenames in os.walk("."):
+            for filename in filenames:
+                parsed = Dataset.FILENAME_PATTERN.match(filename)
+                if parsed:
+                    # parse image: 
+                    image = cv2.imread(os.path.join(dirpath, filename))
+                    self.images.append(image)
+                    # parse label:
+                    label = int(parsed.group(5))
+                    # change unknown code to 3 for deep learning modeling:
+                    if label == 4:
+                        label = 3
+                    self.labels.append(label)
+                else:
+                    continue
 
         # format as numpy array
         self.images = np.asarray(self.images)

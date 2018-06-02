@@ -28,9 +28,8 @@ class TLDetector(object):
         
         @published  /traffic_waypoint:       the index of the waypoint for nearest upcoming red light's stop line
     """
-    CAMERA_IMAGE_COLLECTION_BEFORE_LINE_WPS = 150
-    CAMERA_IMAGE_CLASSIFICATION_WPS = 103
-    CAMERA_IMAGE_COLLECTION_AFTER_LINE_COUNT = 40
+    CAMERA_IMAGE_CLASSIFICATION_WPS = 53
+    CAMERA_IMAGE_COLLECTION_AFTER_LINE_COUNT = 27
 
     def __init__(self):
         rospy.init_node('tl_detector')
@@ -299,17 +298,25 @@ class TLDetector(object):
             # method 02: image analysis
             state_camera = self.get_light_state_from_camera()
 
+            # save for hard negative mining:
+            self.save_traffic_light_image(
+                closest_stop_line_index, order, closest_distance, state_telegram
+            )
+            '''
             # image collection:
-            if state_telegram != state_camera:
+            if state_telegram != state_camera and state_camera != TrafficLight.UNKNOWN:
                 # save for hard negative mining:
                 self.save_traffic_light_image(
                     closest_stop_line_index, order, closest_distance, state_telegram
                 )
                 # prompt:
                 rospy.logwarn(
-                    "[Discrepancy between Telegram and Camera]: %d--%d, Camera Image Saved",state_telegram, state_camera
+                    "[Discrepancy between Telegram and Camera]: %d--%d @ %d, Camera Image Saved",
+                    state_telegram, state_camera,
+                    closest_stop_line_index
                 )
-
+            '''
+            
             return closest_stop_line_waypoint_index, state_telegram
 
         return -1, TrafficLight.UNKNOWN

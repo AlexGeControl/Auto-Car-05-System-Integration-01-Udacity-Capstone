@@ -178,38 +178,12 @@ class WaypointUpdater(object):
             next_lane.waypoints = self.base_waypoints.waypoints[
                 next_waypoint_index_start: next_waypoint_index_end
             ]
-
-            for i in range(5):
-                rospy.logwarn(
-                    "[Normal Waypoints]: %d--%f / %f",
-                    i + 1, 
-                    self.get_waypoint_velocity(next_lane.waypoints[i]),
-                    self.get_waypoint_velocity(self.base_waypoints.waypoints[next_waypoint_index_start + i])
-                )
-            rospy.logwarn(
-                "[Normal Waypoints]: Done--%d",
-                self.stop_line_waypoint_index
-            )
         else:
             next_lane.waypoints = self.generate_decelerated_waypoints(
                 self.base_waypoints.waypoints[
                     next_waypoint_index_start: next_waypoint_index_end
                 ], 
                 next_waypoint_index_start
-            )
-
-            for i in range(
-                min(5, len(next_lane.waypoints))
-            ):
-                rospy.logwarn(
-                    "[Decelerated Waypoints]: %d--%f / %f",
-                    i + 1, 
-                    self.get_waypoint_velocity(next_lane.waypoints[i]),
-                    self.get_waypoint_velocity(self.base_waypoints.waypoints[next_waypoint_index_start + i])
-                )
-            rospy.logwarn(
-                "[Decelerated Waypoints]: Done--%d",
-                self.stop_line_waypoint_index
             )
 
         return next_lane

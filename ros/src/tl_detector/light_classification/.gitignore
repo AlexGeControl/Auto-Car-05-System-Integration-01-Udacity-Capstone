@@ -1,2 +1,5 @@
 # image dataset:
-traffic_light_images/
+traffic_light_images/*
+
+# training log:
+logs/*
