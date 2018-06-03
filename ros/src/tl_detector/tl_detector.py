@@ -298,12 +298,6 @@ class TLDetector(object):
             # method 02: image analysis
             state_camera = self.get_light_state_from_camera()
 
-            '''
-            # save for hard negative mining:
-            self.save_traffic_light_image(
-                closest_stop_line_index, order, closest_distance, state_telegram
-            )
-            '''
             # image collection:
             if state_telegram != state_camera and state_camera != TrafficLight.UNKNOWN:
                 # save for hard negative mining:
@@ -318,6 +312,14 @@ class TLDetector(object):
                 )
             
             return closest_stop_line_waypoint_index, state_camera
+            
+        '''
+        # save for hard negative mining:
+        self.save_traffic_light_image(
+            0, "unknown", 0, 0
+        )
+        rospy.logwarn("test site image saved.")
+        '''
 
         return -1, TrafficLight.UNKNOWN
 
