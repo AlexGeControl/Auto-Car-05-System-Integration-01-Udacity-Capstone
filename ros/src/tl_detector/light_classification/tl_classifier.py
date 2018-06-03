@@ -63,7 +63,6 @@ class TLClassifier(object):
         with self.graph.as_default():
             self.model = self.__build_classifier()
 
-        # init cookbook:
     def __build_classifier(self):
         """ define classifier for traffic light classification
 
