@@ -116,7 +116,7 @@ The ego vehicle follows waypoints given smoothly in simulator
 
 ### 4. Stop and Restart PID Controllers Depending on the State of /vehicle/dbw_enabled
 
-This can be verified with <a href="src/twist_controller/dbw_node.py">DBW node source code</a>. Only when DBW node is enabled will autonomous control commands be sent to ego vehicle to actuate it.
+This can be verified with <a href="ros/src/twist_controller/dbw_node.py">DBW node source code</a>. Only when DBW node is enabled will autonomous control commands be sent to ego vehicle to actuate it.
 
 ```python
 class DBWNode(object):
@@ -157,7 +157,7 @@ class DBWNode(object):
 
 ### 5. Publish Throttle, Steering, and Brake Commands at 50hz
 
-This can be verified with <a href="src/twist_controller/dbw_node.py">DBW node source code</a>. The control command publish frequency is set as 50Hz.
+This can be verified with <a href="ros/src/twist_controller/dbw_node.py">DBW node source code</a>. The control command publish frequency is set as 50Hz.
 
 ```python
 class DBWNode(object):
@@ -208,19 +208,19 @@ System architecture is shown in the following graph.
 
 <img src="doc/architecture/waypoint-update-node.png" width="100%" alt="Waypoint Update" />
 
-<a href="src/waypoint_updater/waypoint_updater.py">Waypoint Update Node</a>
+<a href="ros/src/waypoint_updater/waypoint_updater.py">Waypoint Update Node</a>
 
 ### 2. DBW Control
 
 <img src="doc/architecture/twist-control-node.png" width="100%" alt="DBW Control" />
 
-<a href="src/twist_controller/dbw_node.py">DBW Control Node</a> 
+<a href="ros/src/twist_controller/dbw_node.py">DBW Control Node</a> 
 
 ### 3. Traffic Light Detection
 
 <img src="doc/architecture/traffic-light-detection-and-classification-node.png" width="100%" alt="Traffic Light Detection" />
 
-<a href="src/tl_detector/tl_detector.py">Traffic Light Detection Node</a> detects and classifies incoming traffic light in order to stop ego vehicle correctly at stop line when there is a red light ahead.
+<a href="ros/src/tl_detector/tl_detector.py">Traffic Light Detection Node</a> detects and classifies incoming traffic light in order to stop ego vehicle correctly at stop line when there is a red light ahead.
 
 #### Image Preprocessing
 
