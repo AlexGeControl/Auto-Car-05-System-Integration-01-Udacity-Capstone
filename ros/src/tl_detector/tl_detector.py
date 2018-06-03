@@ -281,6 +281,9 @@ class TLDetector(object):
             (closest_stop_line_waypoint_index) and 
             (closest_distance <= TLDetector.CAMERA_IMAGE_CLASSIFICATION_WPS or self.after_stop_line_count > 0)
         ):
+            '''
+            # code for hard negative mining in simulator
+
             order = "before"
             # ego vehicle just passed stop line:
             if closest_distance > TLDetector.CAMERA_IMAGE_CLASSIFICATION_WPS:
@@ -310,11 +313,14 @@ class TLDetector(object):
                     state_telegram, state_camera,
                     closest_stop_line_index
                 )
-            
+            '''
+            state_camera = self.get_light_state_from_camera()
+
             return closest_stop_line_waypoint_index, state_camera
             
         '''
-        # save for hard negative mining:
+        # code for image collection from test site rosbag:
+        
         self.save_traffic_light_image(
             0, "unknown", 0, 0
         )
